@@ -1,0 +1,27 @@
+// 스프링 부트 플러그인 org.springframework.boot 추가
+// 스프링 의존성 자동 관리 spring.dependency-management 추가
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.0.2'
+    id 'io.spring.dependency-management' version '1.1.0'
+}
+
+group = 'me.devchanyoung'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+// 웹 관련 기능 spring-boot-starter-web: SpringMVC를 사용하여 RESTful 웹 개발
+// 테스트 기능 spring-boot-starter-test: 스프링 애플리케이션으 테스트
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}
