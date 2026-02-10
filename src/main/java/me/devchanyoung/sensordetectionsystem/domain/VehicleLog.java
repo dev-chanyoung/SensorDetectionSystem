@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class VehicleLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,12 +23,7 @@ public class VehicleLog {
     private String vehicleId;
     private double speed;
     private double rpm;
-    private LocalDateTime createdat;
 
-    public VehicleLog(String vehicleId, double speed, double rpm){
-        this.vehicleId = vehicleId;
-        this.speed = speed;
-        this.rpm = rpm;
-        this.createdat = LocalDateTime.now();
-    }
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

@@ -18,9 +18,15 @@ public class VehicleController {
     public String savedLog(@RequestParam String carId,
                            @RequestParam double speed,
                            @RequestParam double rpm) {
-        VehicleLog log = new VehicleLog(carId, speed, rpm);
+
+        VehicleLog log = VehicleLog.builder()
+                .vehicleId(carId)
+                .speed(speed)
+                .rpm(rpm)
+                .build();
+
         vehicleLogRepository.save(log);
 
-        return "저장 성공! ID: " + log.getId();
+        return "저장 성공x! ID: " + log.getId();
     }
 }
