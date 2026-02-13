@@ -1,32 +1,23 @@
 package me.devchanyoung.sensordetectionsystem.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import me.devchanyoung.sensordetectionsystem.domain.VehicleLog;
-import me.devchanyoung.sensordetectionsystem.repository.VehicleLogRepository;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import me.devchanyoung.sensordetectionsystem.dto.VehicleLogRequest;
+import me.devchanyoung.sensordetectionsystem.service.VehicleLogService;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
 public class VehicleController {
 
-    private final VehicleLogRepository vehicleLogRepository;
+    private final VehicleLogService vehicleLogService;
 
-    // 테스트용
-    @GetMapping("/api/log")
-    public String savedLog(@RequestParam String carId,
-                           @RequestParam double speed,
-                           @RequestParam double rpm) {
-
-        VehicleLog log = VehicleLog.builder()
-                .vehicleId(carId)
-                .speed(speed)
-                .rpm(rpm)
-                .build();
-
-        vehicleLogRepository.save(log);
-
-        return "저장 성공x! ID: " + log.getId();
+    // [변경] GET -> POST (데이터 생성은 POST가 표준)
+    // [변경] @RequestParam -> @RequestBody (JSON으로 데이터를 받음)
+    // @Valid 추가: DTO의 제약조건(@Min, @NotBlank 등)을 검사해라!
+    @PostMapping("/api/log")
+    public String saveLog(@Valid @RequestBody VehicleLogRequest request) {
+        Long savedId = vehicleLogService.saveLog(request);
+        return "저장 성공! ID: " + savedId;
     }
 }
