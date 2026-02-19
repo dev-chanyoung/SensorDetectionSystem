@@ -1,5 +1,6 @@
 package me.devchanyoung.sensordetectionsystem.controller;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import me.devchanyoung.sensordetectionsystem.common.ApiResponse;
@@ -9,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -25,6 +28,15 @@ public class VehicleController {
 
         // 통일된 규격(ApiResponse)으로 포장해서 반환
         ApiResponse<Long> response = ApiResponse.success("센서 데이터가 성공적으로 저장되었습니다.", savedId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/api/logs/bulk")
+    public ResponseEntity<ApiResponse<Integer>>saveBulkLogs(@Valid @RequestBody List<VehicleLogRequest> requests) {
+        vehicleLogService.saveBulkLogs(requests);
+
+        // 몇 건 저장되었는지 체크
+        ApiResponse<Integer> response = ApiResponse.success("대용량 센서 데이터 저장 완료", requests.size());
         return ResponseEntity.ok(response);
     }
 }

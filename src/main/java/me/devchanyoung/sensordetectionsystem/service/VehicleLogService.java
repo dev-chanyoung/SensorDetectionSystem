@@ -6,9 +6,12 @@ import me.devchanyoung.sensordetectionsystem.domain.AlertType;
 import me.devchanyoung.sensordetectionsystem.domain.VehicleLog;
 import me.devchanyoung.sensordetectionsystem.dto.VehicleLogRequest;
 import me.devchanyoung.sensordetectionsystem.repository.AlertRepository;
+import me.devchanyoung.sensordetectionsystem.repository.VehicleLogJdbcRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +19,7 @@ public class VehicleLogService {
 
     private final VehicleLogRepository vehicleLogRepository;
     private final AlertRepository alertRepository;
+    private final VehicleLogJdbcRepository vehicleLogJdbcRepository;
 
     // 트랜잭션: 이 메서드 안의 작업은 모두 성공하거나, 하나라도 실패하면 모두 취소됨
     @Transactional
@@ -49,4 +53,22 @@ public class VehicleLogService {
         Alert alert = Alert.createAlert(vehicleId, type, checkedValue);
         alertRepository.save(alert);
     }
+
+    @Transactional
+    public void saveBulkLogs(List<VehicleLogRequest> requests) {
+        // 1. DTO 리스트 -> Entity 리스트
+        List<VehicleLog> logs = requests.stream()
+                .map(VehicleLogRequest::toEntity)
+                .toList();
+
+        // 2. JdbcTemplate을 이용해 한 번에 저장 (속도 극대화)
+        vehicleLogJdbcRepository.saveAllBulk(logs);
+
+        // 3. 이상 징후 탐지
+        for(VehicleLogRequest request : requests){
+            checkAnomaly(request);
+            // 지금은 루프로 하지만  Alter 저장도 Bulk or Kafka로 변경 예정
+        }
+    }
+
 }
