@@ -17,10 +17,12 @@ public class GlobalExceptionHandler {
         BindingResult bindingResult = e.getBindingResult();
         String firstErrorMessage = bindingResult.getFieldError().getDefaultMessage();
 
-        // 우리가 만든 깔끔한 포맷으로 변환
+        // 포맷으로 변환
         ErrorResponse response = new ErrorResponse("INVALID_INPUT", firstErrorMessage);
 
         // HTTP 상태 코드 400(Bad Request)와 함께 반환
         return ResponseEntity.badRequest().body(response);
     }
+
+
 }
