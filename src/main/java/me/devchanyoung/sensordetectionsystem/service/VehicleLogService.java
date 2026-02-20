@@ -31,7 +31,7 @@ public class VehicleLogService {
         // 2. Repository에 저장 요청
         VehicleLog savedLog = vehicleLogRepository.save(vehicleLog);
 
-        // 3. 이상 탐지 로지 실행
+        // 3. 이상 탐지 로직 실행 + 나중에 로그 저장과 분리하여 병목 현상 예방 -> 별도 쓰레드 or 메세지 큐(Kafka) 이용
         checkAnomaly(request);
 
         // 4. Redis 상태 갱신
