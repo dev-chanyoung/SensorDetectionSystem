@@ -6,10 +6,9 @@ import lombok.RequiredArgsConstructor;
 import me.devchanyoung.sensordetectionsystem.common.ApiResponse;
 import me.devchanyoung.sensordetectionsystem.dto.VehicleLogRequest;
 import me.devchanyoung.sensordetectionsystem.service.VehicleLogService;
+import me.devchanyoung.sensordetectionsystem.service.VehicleRedisService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -18,6 +17,7 @@ import java.util.List;
 public class VehicleController {
 
     private final VehicleLogService vehicleLogService;
+    private final VehicleRedisService vehicleRedisService;
 
     // [변경] GET -> POST (데이터 생성은 POST가 표준)
     // [변경] @RequestParam -> @RequestBody (JSON으로 데이터를 받음)
@@ -39,4 +39,18 @@ public class VehicleController {
         ApiResponse<Integer> response = ApiResponse.success("대용량 센서 데이터 저장 완료", requests.size());
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/api/log/{vehicleId}/latest")
+    public ResponseEntity<ApiResponse<String>> getLatestStatus(@PathVariable String vehicleId) {
+        String status = vehicleRedisService.getLatestStatus(vehicleId);
+
+        if(status ==null){
+            return ResponseEntity.ok(ApiResponse.success("최신 데이터가 없습니다.","null"));
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("최신 상태 조회 완료", status));
+    }
+
+
 }
+

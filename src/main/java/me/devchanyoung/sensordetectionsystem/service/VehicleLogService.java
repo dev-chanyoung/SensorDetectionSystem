@@ -20,6 +20,7 @@ public class VehicleLogService {
     private final VehicleLogRepository vehicleLogRepository;
     private final AlertRepository alertRepository;
     private final VehicleLogJdbcRepository vehicleLogJdbcRepository;
+    private final VehicleRedisService vehicleRedisService;
 
     // 트랜잭션: 이 메서드 안의 작업은 모두 성공하거나, 하나라도 실패하면 모두 취소됨
     @Transactional
@@ -33,7 +34,10 @@ public class VehicleLogService {
         // 3. 이상 탐지 로지 실행
         checkAnomaly(request);
 
-        // 4. 저장된 ID 반환
+        // 4. Redis 상태 갱신
+        vehicleRedisService.updateLatestStatus(request.getVehicleId(), request.getSpeed(), request.getRpm());
+
+        // 5. 저장된 ID 반환
         return savedLog.getId();
     }
 
@@ -67,8 +71,15 @@ public class VehicleLogService {
         // 3. 이상 징후 탐지
         for(VehicleLogRequest request : requests){
             checkAnomaly(request);
+            vehicleRedisService.updateLatestStatus(request.getVehicleId(),request.getSpeed(), request.getRpm());
             // 지금은 루프로 하지만  Alter 저장도 Bulk or Kafka로 변경 예정
         }
     }
+
+
+
+
+
+
 
 }
