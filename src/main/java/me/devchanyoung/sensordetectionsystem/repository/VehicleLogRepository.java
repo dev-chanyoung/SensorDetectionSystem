@@ -10,17 +10,18 @@ import java.util.List;
 
 public interface VehicleLogRepository extends JpaRepository<VehicleLog, Long> {
 
-    @Query("select v.vehicleId AS vehicleId, AVG(v.speed) AS avgSpeed, MAX(v.speed) AS maxSpeed " +
+    @Query("select v.vehicleId AS vehicleId, AVG(v.speed) AS avgSpeed, MAX(v.speed) AS maxSpeed, COUNT(v.id) AS dataCount " +
             "from VehicleLog v " +
             "where v.createdAt >= :start AND v.createdAt < :end " +
             "group by v.vehicleId")
-    List<DailyStatProjection> findDailyStats(@Param("start")LocalDateTime start, @Param("end") LocalDateTime end);
+    List<HourlyStatProjection> findHourlyStats(@Param("start")LocalDateTime start, @Param("end") LocalDateTime end);
 
 
-    interface DailyStatProjection {
+    interface HourlyStatProjection {
         String getVehicleId();
         double getMaxSpeed();
         double getAvgSpeed();
+        long getDataCount();
     }
 }
 

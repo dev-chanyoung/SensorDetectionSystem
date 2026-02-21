@@ -5,9 +5,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.*;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,23 +13,27 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class DaliyVehicleStats {
+public class HourlyVehicleStats {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String vehicleId;
-    private LocalDate recordDate;
+
+    private LocalDateTime recordHour;
+
     private double avgSpeed;
     private double maxSpeed;
+    private long dataCount;
 
-
-    public static DaliyVehicleStats createStats(String vehicleId, LocalDate recordDate, Double avgSpeed, Double maxSpeed){
-        return DaliyVehicleStats.builder()
+    public static HourlyVehicleStats create(String vehicleId, LocalDateTime recordHour, Double avgSpeed, Double maxSpeed, long dataCount){
+        return HourlyVehicleStats.builder()
                 .vehicleId(vehicleId)
-                .recordDate(recordDate)
+                .recordHour(recordHour)
                 .avgSpeed(avgSpeed)
                 .maxSpeed(maxSpeed)
+                .dataCount(dataCount)
                 .build();
     }
 }
