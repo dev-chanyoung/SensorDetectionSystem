@@ -8,6 +8,7 @@ import me.devchanyoung.sensordetectionsystem.dto.VehicleLogRequest;
 import me.devchanyoung.sensordetectionsystem.repository.AlertRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogJdbcRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,12 @@ public class VehicleLogService {
     private final AlertRepository alertRepository;
     private final VehicleLogJdbcRepository vehicleLogJdbcRepository;
     private final VehicleRedisService vehicleRedisService;
+
+    @Value("${sensor.limit.speed}")
+    private double speedLimit;
+
+    @Value("${sensor.limit.rpm}")
+    private double rpmLimit;
 
     // 트랜잭션: 이 메서드 안의 작업은 모두 성공하거나, 하나라도 실패하면 모두 취소됨
     @Transactional
@@ -43,12 +50,12 @@ public class VehicleLogService {
 
     public void checkAnomaly(VehicleLogRequest request) {
         // 과속 체크 (150km/h 초과)
-        if (request.getSpeed() > 150){
+        if (request.getSpeed() > speedLimit) {
             saveAlert(request.getVehicleId(), AlertType.SPEEDING, request.getSpeed());
         }
 
         // 급가속 체크(5000rpm 초과)
-        if (request.getRpm() > 5000) {
+        if (request.getRpm() > rpmLimit) {
             saveAlert(request.getVehicleId(), AlertType.SUDDEN_ACCEL, request.getRpm());
         }
     }
