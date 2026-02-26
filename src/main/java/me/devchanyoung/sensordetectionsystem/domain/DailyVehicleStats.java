@@ -21,13 +21,15 @@ public class DailyVehicleStats {
 
     private double avgSpeed;
     private double maxSpeed;
+    private int safetyScore;
 
-    public static DailyVehicleStats createStats(String vehicleId, LocalDate recordDate, double avgSpeed, double maxSpeed) {
+    public static DailyVehicleStats createStats(String vehicleId, LocalDate recordDate, double avgSpeed, double maxSpeed, int safetyScore) {
         return DailyVehicleStats.builder()
                 .vehicleId(vehicleId)
                 .recordDate(recordDate)
                 .avgSpeed(avgSpeed)
                 .maxSpeed(maxSpeed)
+                .safetyScore(safetyScore)
                 .build();
     }
 }
