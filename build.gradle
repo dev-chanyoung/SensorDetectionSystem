@@ -21,15 +21,14 @@ dependencies {
     // 2. JPA (추가 필요: @Entity 등 사용)
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
-    // 3. Lombok (추가 필요: @Getter, @Setter 등 사용)
+    // 3. Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // 4. Database Driver (추가 필요: 둘 중 하나 선택)
-    // 개발/테스트용 H2 데이터베이스 (가볍게 돌려볼 때 추천)
-    runtimeOnly 'com.h2database:h2'
-    // 만약 MySQL을 쓴다면 아래 주석 해제하고 h2는 주석 처리
-    // runtimeOnly 'com.mysql:mysql-connector-j'
+    // 4. Database Driver
+    // 개발/테스트용 H2 데이터베이스
+    // runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'org.postgresql:postgresql'
 
     // Test (기존 유지 + 롬복 테스트 지원 추가)
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
@@ -38,6 +37,10 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // swagger 라이브러리 추가
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
 }
 
 test {

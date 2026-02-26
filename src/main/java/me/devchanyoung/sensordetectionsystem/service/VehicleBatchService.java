@@ -72,9 +72,9 @@ public class VehicleBatchService {
         for (VehicleLogRepository.HourlyStatProjection stat : statsList) {
 
             // 1. 이상 탐지 발생 횟수 조회
-            long speedingCount = alertRepository.countByVehicleIdAndTypeDate(
+            long speedingCount = alertRepository.countByVehicleIdAndTypeAndDate(
                     stat.getVehicleId(), AlertType.SPEEDING, startOfDay, endOfDay);
-            long suddenAccelCount = alertRepository.countByVehicleIdAndTypeDate(
+            long suddenAccelCount = alertRepository.countByVehicleIdAndTypeAndDate(
                     stat.getVehicleId(), AlertType.SUDDEN_ACCEL, startOfDay, endOfDay);
 
             // 2. 안전 점수 계산(알고리즘: 100점 기본, 과속 1회당 -5점, 금가속 1회당 -10점)
