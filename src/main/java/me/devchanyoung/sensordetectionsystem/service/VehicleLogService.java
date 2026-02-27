@@ -32,12 +32,12 @@ public class VehicleLogService {
     @Transactional
     public Long saveLog(VehicleLogRequest request) {
         // 1. 센서 데이터 DB 저장
-        VehicleLog logEncitiy = VehicleLog.builder()
+        VehicleLog logEntity = VehicleLog.builder()
                 .vehicleId(request.getVehicleId())
                 .speed(request.getSpeed())
                 .rpm(request.getRpm())
                 .build();
-        VehicleLog savedLog = vehicleLogRepository.save(logEncitiy);
+        VehicleLog savedLog = vehicleLogRepository.save(logEntity);
 
         // 2. RabbitMQ로 메시지 발행(비동기 처리 외부 큐로 위임)
         VehicleLogMessage message = new VehicleLogMessage(
@@ -49,7 +49,7 @@ public class VehicleLogService {
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.EXCHANGE_NAME,
                 RabbitMQConfig.ROUTING_KEY,
-                message
+                List.of(message)
         );
 
         return savedLog.getId();
@@ -66,20 +66,22 @@ public class VehicleLogService {
                         .build())
                 .toList();
 
+        // 2. DB 일괄 저장
         vehicleLogJdbcRepository.saveAllBulk(logs);
 
-        // 3. 저장된 데이터를 순회하며 RabbitMQ 큐에 비동기 메시지 발행
-        for (VehicleLogRequest request : requests) {
-            VehicleLogMessage message = new VehicleLogMessage(
-                    request.getVehicleId(),
-                    request.getSpeed(),
-                    request.getRpm()
-            );
+        // 3. MQ 전송용 메시지 리스트 생성
+        List<VehicleLogMessage> messages = requests.stream()
+                .map(req -> new VehicleLogMessage(
+                        req.getVehicleId(),
+                        req.getSpeed(),
+                        req.getRpm()
+                ))
+                .toList();
 
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.EXCHANGE_NAME,
                     RabbitMQConfig.ROUTING_KEY,
-                    message
+                    messages
             );
         }
     }
