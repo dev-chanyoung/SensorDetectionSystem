@@ -44,6 +44,9 @@ dependencies {
     // 대용량 트래픽 테스트 사전준비(데이터 수집 및 포맷 변환)
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
+    // amqp 통신
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
 }
 
 test {
