@@ -25,7 +25,7 @@ public class RabbitMQConfig {
         return new Queue(ALERT_QUEUE_NAME, true);
     }
 
-    // 3. 교환기와 큐를 라우팅 키로 바인딩
+    // 3. 교환기와 큐를 라우팅 키로 바인딩 
     @Bean
     public Binding alertBinding(Queue alertQueue, DirectExchange vehicleExchange) {
         return BindingBuilder.bind(alertQueue).to(vehicleExchange).with(ROUTING_KEY);

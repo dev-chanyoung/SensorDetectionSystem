@@ -1,14 +1,17 @@
 package me.devchanyoung.sensordetectionsystem.service;
 
 import lombok.RequiredArgsConstructor;
+import me.devchanyoung.sensordetectionsystem.config.RabbitMQConfig;
 import me.devchanyoung.sensordetectionsystem.domain.Alert;
 import me.devchanyoung.sensordetectionsystem.domain.AlertType;
 import me.devchanyoung.sensordetectionsystem.domain.VehicleLog;
+import me.devchanyoung.sensordetectionsystem.dto.VehicleLogMessage;
 import me.devchanyoung.sensordetectionsystem.dto.VehicleLogRequest;
 import me.devchanyoung.sensordetectionsystem.dto.VehicleLogSavedEvent;
 import me.devchanyoung.sensordetectionsystem.repository.AlertRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogJdbcRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogRepository;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -21,37 +24,59 @@ import java.util.List;
 public class VehicleLogService {
 
     private final VehicleLogRepository vehicleLogRepository;
-    private final VehicleLogJdbcRepository vehicleLogJdbcRepository;
+    private final RabbitTemplate rabbitTemplate;
 
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Long saveLog(VehicleLogRequest request) {
-        // 1. DTO를 Entity로 변환
-        VehicleLog vehicleLog = request.toEntity();
+        // 1. 센서 데이터 DB 저장
+        VehicleLog logEncitiy = VehicleLog.builder()
+                .vehicleId(request.getVehicleId())
+                .speed(request.getSpeed())
+                .rpm(request.getRpm())
+                .build();
+        VehicleLog savedLog = vehicleLogRepository.save(logEncitiy);
 
-        // 2. Repository에 저장 요청
-        VehicleLog savedLog = vehicleLogRepository.save(vehicleLog);
+        // 2. RabbitMQ로 메시지 발행(비동기 처리 외부 큐로 위임)
+        VehicleLogMessage message = new VehicleLogMessage(
+                savedLog.getVehicleId(),
+                savedLog.getSpeed(),
+                savedLog.getRpm()
+        );
 
-        // 3. 이벤트 발행
-        eventPublisher.publishEvent(new VehicleLogSavedEvent(request.getVehicleId(), request.getSpeed(), request.getRpm()));
+        // log.info("MQ 메시지 발행 - 차량: {}", savedLog.getVehicleId());
 
         return savedLog.getId();
     }
 
     @Transactional
     public void saveBulkLogs(List<VehicleLogRequest> requests) {
-        // 1. DTO 리스트 -> Entity 리스트
+        // 1. Request DTO List -> Entity List 변환
         List<VehicleLog> logs = requests.stream()
-                .map(VehicleLogRequest::toEntity)
+                .map(req -> VehicleLog.builder()
+                        .vehicleId(req.getVehicleId())
+                        .speed(req.getSpeed())
+                        .rpm(req.getRpm())
+                        .build())
                 .toList();
 
-        // 2. JdbcTemplate을 이용해 한 번에 저장 (속도 극대화)
-        vehicleLogJdbcRepository.saveAllBulk(logs);
+        // 2. DB에 일괄 저장
+        List<VehicleLog> savedLogs = vehicleLogRepository.saveAll(logs);
 
-        // 3. 이상 징후 탐지
-        for(VehicleLogRequest request : requests){
-            eventPublisher.publishEvent(new VehicleLogSavedEvent(request.getVehicleId(), request.getSpeed(), request.getRpm()));
+        // 3. 저장된 데이터를 순회하며 RabbitMQ 큐에 비동기 메시지 발행
+        for (VehicleLog savedLog : savedLogs) {
+            VehicleLogMessage message = new VehicleLogMessage(
+                    savedLog.getVehicleId(),
+                    savedLog.getSpeed(),
+                    savedLog.getRpm()
+            );
+
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EXCHANGE_NAME,
+                    RabbitMQConfig.ROUTING_KEY,
+                    message
+            );
         }
     }
 }
