@@ -24,9 +24,10 @@ import java.util.List;
 public class VehicleLogService {
 
     private final VehicleLogRepository vehicleLogRepository;
+    private final VehicleLogJdbcRepository vehicleLogJdbcRepository;
     private final RabbitTemplate rabbitTemplate;
 
-    private final ApplicationEventPublisher eventPublisher;
+
 
     @Transactional
     public Long saveLog(VehicleLogRequest request) {
@@ -45,7 +46,11 @@ public class VehicleLogService {
                 savedLog.getRpm()
         );
 
-        // log.info("MQ 메시지 발행 - 차량: {}", savedLog.getVehicleId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY,
+                message
+        );
 
         return savedLog.getId();
     }
@@ -61,15 +66,14 @@ public class VehicleLogService {
                         .build())
                 .toList();
 
-        // 2. DB에 일괄 저장
-        List<VehicleLog> savedLogs = vehicleLogRepository.saveAll(logs);
+        vehicleLogJdbcRepository.saveAllBulk(logs);
 
         // 3. 저장된 데이터를 순회하며 RabbitMQ 큐에 비동기 메시지 발행
-        for (VehicleLog savedLog : savedLogs) {
+        for (VehicleLogRequest request : requests) {
             VehicleLogMessage message = new VehicleLogMessage(
-                    savedLog.getVehicleId(),
-                    savedLog.getSpeed(),
-                    savedLog.getRpm()
+                    request.getVehicleId(),
+                    request.getSpeed(),
+                    request.getRpm()
             );
 
             rabbitTemplate.convertAndSend(
