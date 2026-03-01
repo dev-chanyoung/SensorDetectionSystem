@@ -18,7 +18,21 @@
 <br>
 
 ## 📌 아키텍처 흐름
+```mermaid
+flowchart LR
+    Client[Vehicle Sensor] -->|POST /api/log| API[Spring Boot API Server]
 
+    subgraph "SafeCar Backend System"
+        API -->|1. Sync Save| DB[(PostgreSQL)]
+        API -->|2. Async Produce| MQ[[RabbitMQ]]
+
+        MQ -->|3. Consume| Listener[MQ Consumer]
+        Listener -->|4. Update| Cache[(Redis)]
+        Listener -->|5. Save Alert| DB
+
+        Batch[Spring Scheduler] -.->|6. Aggregate & Score| DB
+    end
+```
 1. [Data Ingestion] 클라이언트(차량)로부터 센서 데이터 대량 유입 (POST `/api/log`)
 2. [Main Transaction] 핵심 센서 데이터를 PostgreSQL에 즉시 적재
 3. [Event Produce] 부가 로직(이상 탐지, 알림) 처리를 위해 RabbitMQ로 메시지 비동기 발행
@@ -36,7 +50,52 @@
     * Tomcat Thread(12), HikariCP(17), RabbitMQ Consumer Concurrency(1), Prefetch(10)로 수치를 정교하게 튜닝.
     * DB 커넥션을 API 응답 스레드에 집중시키고, Consumer는 메시지를 큐에서 점진적으로 가져가 백그라운드에서 처리하도록 자원 분배.
 * 결과: 트래픽 폭주 시 내부 DB가 뻗는 대신 앞단에서 연결을 제어하는 Fail-Fast 아키텍처 구축. 에러율 0%로 안정적인 비동기 파이프라인 검증 완료.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Vehicle (Client)
+    participant API as VehicleController
+    participant Service as VehicleLogService
+    participant DB as PostgreSQL (VehicleLog)
+    participant MQ as RabbitMQ
+    participant Listener as MQ Consumer
+    participant Redis as Redis (Latest Status)
+    participant AlertDB as PostgreSQL (Alert & Stats)
+    participant Batch as VehicleBatchService
 
+    %% 1. 데이터 수집 및 비동기 발행
+    rect rgb(240, 248, 255)
+    Note over Client, MQ: 1. 메인 트랜잭션 (센서 데이터 적재 및 큐 발행)
+    Client->>API: POST /api/log (센서 데이터)
+    API->>Service: saveLog(request)
+    Service->>DB: 1차 센서 데이터 적재 (Insert)
+    DB-->>Service: Saved ID 반환
+    Service->>MQ: 메시지 비동기 발행 (Produce)
+    Service-->>API: 로직 종료 (Success)
+    API-->>Client: 200 OK 응답 (빠른 반환)
+    end
+
+    %% 2. 비동기 컨슈머 로직
+    rect rgb(255, 240, 245)
+    Note over MQ, AlertDB: 2. 부가 로직 비동기 처리 (이상 탐지 및 캐싱)
+    MQ-->>Listener: 메시지 소비 (Consume)
+    Listener->>Redis: 차량 최신 상태 갱신 (O(1) 조회용)
+    alt 속도/RPM 임계치 초과 시
+        Listener->>AlertDB: 경고 내역 적재 (Alert Insert)
+    end
+    end
+
+    %% 3. 스케줄러 배치 로직
+    rect rgb(240, 255, 240)
+    Note over AlertDB, Batch: 3. 스케줄러 기반 데이터 정산 및 안전점수 산출
+    loop 1시간 단위 (중간 집계) / 매일 자정 (일일 정산)
+        Batch->>DB: 시간대별 원본 데이터 집계 조회
+        Batch->>AlertDB: 기간 내 이상 탐지(과속/급가속) 횟수 조회
+        Batch->>Batch: 안전 점수 감점 알고리즘 적용
+        Batch->>AlertDB: DailyVehicleStats 적재 (일일 통계 및 점수)
+    end
+    end
+```
 ### 2. 중간 집계(Rolling Aggregation) 배치 파이프라인 구축
 * 문제 상황: 수천만 건의 일일 센서 데이터를 자정에 한 번에 정산할 경우 발생하는 RDBMS의 Lock 현상과 메모리 과부하 리스크.
 * 해결 방안: Spring Scheduler를 활용하여 1시간 단위로 데이터를 미리 계산(평균/최고 속도)하여 요약 테이블(`HourlyVehicleStats`)에 적재.
