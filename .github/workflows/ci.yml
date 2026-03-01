@@ -1,0 +1,33 @@
+name: SafeCar CI Pipeline
+
+# 1. 동작 조건: main 브랜치에 Push 되거나 Pull Request가 열릴 때 실행
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # 2. 실행 환경
+
+    steps:
+      # 3. GitHub 저장소의 코드를 가상 환경으로 내려받기
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # 4. Java 17 세팅
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle' # Gradle 의존성 캐싱 (빌드 속도 최적화)
+
+      # 5. gradlew 실행 권한 부여
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 6. 의존성 다운로드, 코드 컴파일 및 단위 테스트(JUnit) 전체 실행
+      - name: Build and Test with Gradle
+        run: ./gradlew build
