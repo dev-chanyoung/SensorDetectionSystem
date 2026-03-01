@@ -1,8 +1,8 @@
 package me.devchanyoung.sensordetectionsystem.service;
 
+import me.devchanyoung.sensordetectionsystem.config.RabbitMQConfig;
 import me.devchanyoung.sensordetectionsystem.domain.VehicleLog;
 import me.devchanyoung.sensordetectionsystem.dto.VehicleLogRequest;
-import me.devchanyoung.sensordetectionsystem.dto.VehicleLogSavedEvent;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogJdbcRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -11,13 +11,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 public class VehicleLogServiceTest {
@@ -32,11 +35,11 @@ public class VehicleLogServiceTest {
     private VehicleLogJdbcRepository vehicleLogJdbcRepository;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private RabbitTemplate rabbitTemplate;
 
     @Test
-    @DisplayName("정상 데이터 유입 시 DB 저장 및 비동기 이벤트 1회 발생")
-    void saveLog_Success_PublishesEvent(){
+    @DisplayName("정상 데이터 유입 시 DB 저장 및 RabbitMQ 메시지 1회 발생")
+    void saveLog_Success_PublishesMessage(){
         // Given
         VehicleLogRequest request = new VehicleLogRequest();
         request.setVehicleId("Test-01");
@@ -58,7 +61,12 @@ public class VehicleLogServiceTest {
         // Then
         assertThat(savedId).isEqualTo(1L);
         verify(vehicleLogRepository, times(1)).save(any(VehicleLog.class));
-        verify(eventPublisher, times(1)).publishEvent(any(VehicleLogSavedEvent.class));
+
+        verify(rabbitTemplate, times(1)).convertAndSend(
+                eq(RabbitMQConfig.EXCHANGE_NAME),
+                eq(RabbitMQConfig.ROUTING_KEY),
+                any(List.class)
+        );
     }
 
 
