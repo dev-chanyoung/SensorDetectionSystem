@@ -108,7 +108,7 @@ sequenceDiagram
 <br>
 
 ## ⚙️ 주요 기능 및 API 문서
-![img.png](docs/images/swagger-api-summary.png)
+![API Summary](docs/images/swagger-api-summary.png)
 
 | API | Method | Endpoint | Description |
 |---|---|---|---|
@@ -131,10 +131,12 @@ Docker Compose를 사용하여 애플리케이션에 필요한 인프라(Postgre
 
 ```bash
 # 1. 프로젝트 클론 및 디렉토리 이동
-$git clone [https://github.com/dev-chanyoung/SensorDetectionSystem.git$](https://github.com/dev-chanyoung/SensorDetectionSystem.git$) cd SensorDetectionSystem
+$ git clone https://github.com/dev-chanyoung/SensorDetectionSystem.git
+$ cd SensorDetectionSystem
 
 # 2. 인프라(PostgreSQL, Redis, RabbitMQ) 컨테이너 백그라운드 실행
 $ docker-compose up -d
 
 # 3. 애플리케이션 빌드 및 실행 (로컬 환경)
 $ ./gradlew bootRun
+```

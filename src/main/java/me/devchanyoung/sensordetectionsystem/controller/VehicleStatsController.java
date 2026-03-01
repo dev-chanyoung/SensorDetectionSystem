@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 @Tag(name = "Vehicle Stats API", description = "차량 통계 및 안전 점수 조회 API")
 @RestController
-@RequestMapping("/apt/stats")
+@RequestMapping("/api/stats")
 @RequiredArgsConstructor
 public class VehicleStatsController {
 

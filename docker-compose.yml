@@ -16,7 +16,7 @@ services:
     environment:
       # 컨테이너 내부에서 접근할 Redis 호스트명
       - SPRING_DATA_REDIS_HOST=redis
-      -
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: safecar-rabbitmq
