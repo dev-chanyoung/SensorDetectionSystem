@@ -12,7 +12,7 @@
 - Framework: Spring Boot 3.0.2, Spring Data JPA
 - Database & Cache: PostgreSQL, Redis
 - Message Queue: RabbitMQ
-- Test & Monitoring: JUnit5, JMeter, Spring Boot Actuator, Prometheus
+- Test & Monitoring: Test & Monitoring: JUnit5, JMeter, Custom SensorSimulator(자체 구현), Spring Boot Actuator, Prometheus
 - Infra & CI/CD: Docker, Docker Compose, GitHub Actions
 
 <br>
@@ -35,7 +35,7 @@ flowchart LR
 ```
 1. [Data Ingestion] 클라이언트(차량)로부터 센서 데이터 대량 유입 (POST `/api/log`)
 2. [Main Transaction] 핵심 센서 데이터를 PostgreSQL에 즉시 적재
-3. [Event Produce] 부가 로직(이상 탐지, 알림) 처리를 위해 RabbitMQ로 메시지 비동기 발행
+3. [Event Produce] ApplicationEvent를 활용하여 메인 DB 저장 트랜잭션과 부가 로직의 결합도를 완전히 분리하고, RabbitMQ로 메시지 비동기 발행
 4. [Event Consume] MQ Consumer가 Redis 최신 상태 갱신 및 경고(Alert) DB 저장 수행
 5. [Batch Processing] Spring Scheduler 기반의 중간 집계(Rolling Aggregation) 및 자정 안전 점수 산출
 
@@ -46,11 +46,11 @@ flowchart LR
 ### 1. 🧠 성능 최적화 Deep Dive: 자원 경합 해결 및 고가용성 파이프라인 구축
 
 **[Challenge: 동기 처리 아키텍처의 한계와 DB 커넥션 고갈]**
-* 초당 1,000건 이상의 차량 센서 데이터 실시간 수집을 목표로 VUSER 5,000명 규모의 극한 부하 테스트를 진행했습니다.
+* 초당 1,000건 이상의 차량 센서 데이터 실시간 수집을 목표로, JMeter와 함께 실제 차량 센서 유입 환경을 모사하는 자체 SensorSimulator를 직접 구현하여 VUSER 5,000명 규모의 극한 부하 테스트를 진행했습니다.
 * 초기에는 단일 API 스레드가 데이터 저장과 이상 탐지 로직(DB Insert 2회)을 모두 동기적으로 수행했습니다. 그 결과, 극한 부하 시 하드웨어 한계인 **17개의 DB 커넥션 풀이 순식간에 고갈되며 52.10%의 500 에러**가 발생하는 치명적인 병목을 확인했습니다.
 
 **[Action 1: 비동기 메시지 큐(RabbitMQ) 도입 및 벌크 인서트 적용]**
-* **MQ 도입:** 알람 처리 등의 부가 로직을 RabbitMQ 기반의 Producer-Consumer 구조로 분리하여 외부 큐로 위임했습니다.
+* **MQ 도입 및 결합도 분리:** 알람 처리 등의 부가 로직을 RabbitMQ 기반의 Producer-Consumer 구조로 위임했습니다. 이때 서비스 계층에서 직접 MQ를 호출하지 않고 Spring Event(@TransactionalEventListener)를 발행하여 메인 비즈니스 로직과 외부 인프라 연동 로직의 강한 결합을 끊어냈습니다.
 * **풍선 효과(I/O 병목) 해결:** 대량 데이터 저장 시, 단건 처리로 인한 네트워크 I/O 블로킹이 발생하며 톰캣 대기열이 터지는 이슈가 발생했습니다. 이를 해결하기 위해 JPA `saveAll()`을 걷어내고 `JdbcTemplate.batchUpdate`를 적용해 쿼리 전송을 최소화했으며, MQ 발행(Publish) 역시 Batch 처리로 개편했습니다.
 
 ```mermaid
@@ -115,7 +115,7 @@ sequenceDiagram
 | **Step 2** | **최적화 (Tomcat: 12 / Pool: 17 / Concurrency: 1)** | **0.00%** | **정상 부하(2,000/5s) 완벽 수용** |
 
 > 💡 **Load Shedding 아키텍처 검증**
-> 부하(5,000/5s) 초과 트래픽 발생 시, 내부 DB가 뻗게 내버려 두는 대신 앞단에서 즉시 연결을 거절하는 **Fail-Fast)** 아키텍처가 정상 작동함을 확인했습니다. 
+> 부하(5,000/5s) 초과 트래픽 발생 시, 내부 DB가 뻗게 내버려 두는 대신 앞단에서 즉시 연결을 거절하는 **Fail-Fast)** 아키텍처가 정상 작동함을 확인했습니다. 또한 @ControllerAdvice를 활용한 글로벌 예외 처리를 통해 클라이언트에게 예측 가능한 에러 응답을 반환하도록 설계했습니다.
 > 한정된 하드웨어 자원 하에서는 무조건적으로 스레드를 늘리는 것보다, **"Web Thread - DB Connection Pool - MQ Consumer" 간의 치밀한 자원 분배를 통해 코어 시스템(DB)을 보호하는 것이 고가용성 설계의 핵심**임을 증명했습니다.
 
 <br>
