@@ -142,6 +142,7 @@ $ ./gradlew bootRun
 ```
 
 <br>
+
 ## 💡 회고 및 배운 점 (Retrospective)
 
 **"Scale-up 이전에, 애플리케이션 레벨의 파라미터 튜닝이 성능에 미치는 결정적 영향력"**
