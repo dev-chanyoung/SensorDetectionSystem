@@ -35,7 +35,7 @@ flowchart LR
 ```
 1. [Data Ingestion] 클라이언트(차량)로부터 센서 데이터 대량 유입 (POST `/api/log`)
 2. [Main Transaction] 핵심 센서 데이터를 PostgreSQL에 즉시 적재
-3. [Event Produce] ApplicationEvent를 활용하여 메인 DB 저장 트랜잭션과 부가 로직의 결합도를 완전히 분리하고, RabbitMQ로 메시지 비동기 발행
+3. [MQ Produce] 메인 트랜잭션 내에서 RabbitMQ로 메시지 발행 — 알람 처리 등 부가 로직을 메인 스레드에서 완전히 분리
 4. [Event Consume] MQ Consumer가 Redis 최신 상태 갱신 및 경고(Alert) DB 저장 수행
 5. [Batch Processing] Spring Scheduler 기반의 중간 집계(Rolling Aggregation) 및 자정 안전 점수 산출
 
@@ -50,7 +50,8 @@ flowchart LR
 * 초기에는 단일 API 스레드가 데이터 저장과 이상 탐지 로직(DB Insert 2회)을 모두 동기적으로 수행했습니다. 그 결과, 극한 부하 시 하드웨어 한계인 **17개의 DB 커넥션 풀이 순식간에 고갈되며 52.10%의 500 에러**가 발생하는 치명적인 병목을 확인했습니다.
 
 **[Action 1: 비동기 메시지 큐(RabbitMQ) 도입 및 벌크 인서트 적용]**
-* **MQ 도입 및 결합도 분리:** 알람 처리 등의 부가 로직을 RabbitMQ 기반의 Producer-Consumer 구조로 위임했습니다. 이때 서비스 계층에서 직접 MQ를 호출하지 않고 Spring Event(@TransactionalEventListener)를 발행하여 메인 비즈니스 로직과 외부 인프라 연동 로직의 강한 결합을 끊어냈습니다.
+* **MQ 도입 및 결합도 분리:** 알람 처리 등의 부가 로직을 RabbitMQ 기반의 Producer-Consumer 구조로 위임하여 메인 트랜잭션과 분리했습니다.
+* **설계 변경(ADR): Spring Event → RabbitMQ.** 처음에는 서비스 계층에서 직접 MQ를 호출하지 않고 `ApplicationEvent` + `@TransactionalEventListener(phase = AFTER_COMMIT)`로 결합도를 분리하는 방식을 시도했습니다. 하지만 두 가지 한계가 명확했습니다 — ① 인메모리 이벤트라 서버가 커밋 직후 죽으면 아직 처리되지 않은 이벤트가 그냥 유실되고(내구성 없음), ② `@EnableAsync`만으로는 기본적으로 무제한 스레드 실행기를 쓰게 되어 대량 이벤트가 한꺼번에 쏟아지면 자원 고갈 위험이 있었습니다. RabbitMQ는 큐를 `durable=true`로 선언해 서버가 죽어도 메시지가 보존되고, Consumer의 동시성(Concurrency)·Prefetch를 명시적으로 제한할 수 있어 이 두 문제를 구조적으로 해결합니다. 그래서 이벤트 기반 결합도 분리는 유지하되, 전달 수단만 Spring의 인메모리 이벤트에서 RabbitMQ로 교체했습니다 — 현재 `VehicleLogService`는 메인 트랜잭션 안에서 `RabbitTemplate`으로 직접 발행합니다.
 * **풍선 효과(I/O 병목) 해결:** 대량 데이터 저장 시, 단건 처리로 인한 네트워크 I/O 블로킹이 발생하며 톰캣 대기열이 터지는 이슈가 발생했습니다. 이를 해결하기 위해 JPA `saveAll()`을 걷어내고 `JdbcTemplate.batchUpdate`를 적용해 쿼리 전송을 최소화했으며, MQ 발행(Publish) 역시 Batch 처리로 개편했습니다.
 
 ```mermaid
@@ -115,7 +116,7 @@ sequenceDiagram
 | **Step 2** | **최적화 (Tomcat: 12 / Pool: 17 / Concurrency: 1)** | **0.00%** | **정상 부하(2,000/5s) 완벽 수용** |
 
 > 💡 **Load Shedding 아키텍처 검증**
-> 부하(5,000/5s) 초과 트래픽 발생 시, 내부 DB가 뻗게 내버려 두는 대신 앞단에서 즉시 연결을 거절하는 **Fail-Fast)** 아키텍처가 정상 작동함을 확인했습니다. 또한 @ControllerAdvice를 활용한 글로벌 예외 처리를 통해 클라이언트에게 예측 가능한 에러 응답을 반환하도록 설계했습니다.
+> 최종 튜닝 설정(Tomcat 12 / Concurrency 1)으로 하드웨어 한계를 넘어서는 5,000 VUSER 극한 부하를 걸었을 때, 서버는 **TPS 4,857.63**까지 처리량을 끌어올리면서 감당 가능한 트래픽은 DB에 안정적으로 적재하고, 한계를 초과하는 트래픽은 내부 DB가 타임아웃으로 뻗게 두는 대신 앞단(Tomcat)에서 즉시 연결을 거절(Connection Refused)하는 **Fail-Fast** 동작을 확인했습니다. 또한 @ControllerAdvice를 활용한 글로벌 예외 처리를 통해 클라이언트에게 예측 가능한 에러 응답을 반환하도록 설계했습니다.
 > 한정된 하드웨어 자원 하에서는 무조건적으로 스레드를 늘리는 것보다, **"Web Thread - DB Connection Pool - MQ Consumer" 간의 치밀한 자원 분배를 통해 코어 시스템(DB)을 보호하는 것이 고가용성 설계의 핵심**임을 증명했습니다.
 
 <br>
