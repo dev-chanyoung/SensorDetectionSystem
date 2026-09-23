@@ -1,5 +1,15 @@
 version: '3.8'
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: safecar-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=safecar
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root
+
   redis:
     image: redis:alpine
     container_name: safecar-redis
@@ -12,10 +22,14 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      - postgres
       - redis
+      - rabbitmq
     environment:
-      # 컨테이너 내부에서 접근할 Redis 호스트명
+      # 컨테이너 내부에서는 localhost가 아니라 서비스명으로 접근해야 함
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/safecar
       - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
 
   rabbitmq:
     image: rabbitmq:3-management-alpine

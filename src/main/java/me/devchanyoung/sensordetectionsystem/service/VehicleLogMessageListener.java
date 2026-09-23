@@ -22,10 +22,10 @@ public class VehicleLogMessageListener {
     private final AlertRepository alertRepository;
     private final VehicleRedisService vehicleRedisService;
 
-    @Value("${vehicle.limit.speed: 150}")
+    @Value("${sensor.limit.speed:150}")
     private double speedLimit;
 
-    @Value("${vehicle.limit.rpm: 5000}")
+    @Value("${sensor.limit.rpm:5000}")
     private double rpmLimit;
 
     @RabbitListener(queues = RabbitMQConfig.ALERT_QUEUE_NAME)
