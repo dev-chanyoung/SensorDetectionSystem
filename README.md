@@ -51,7 +51,7 @@ flowchart LR
 
 **[Action 1: 비동기 메시지 큐(RabbitMQ) 도입 및 벌크 인서트 적용]**
 * **MQ 도입 및 결합도 분리:** 알람 처리 등의 부가 로직을 RabbitMQ 기반의 Producer-Consumer 구조로 위임하여 메인 트랜잭션과 분리했습니다.
-* **설계 변경(ADR): Spring Event → RabbitMQ.** 처음에는 서비스 계층에서 직접 MQ를 호출하지 않고 `ApplicationEvent` + `@TransactionalEventListener(phase = AFTER_COMMIT)`로 결합도를 분리하는 방식을 시도했습니다. 하지만 두 가지 한계가 명확했습니다 — ① 인메모리 이벤트라 서버가 커밋 직후 죽으면 아직 처리되지 않은 이벤트가 그냥 유실되고(내구성 없음), ② `@EnableAsync`만으로는 기본적으로 무제한 스레드 실행기를 쓰게 되어 대량 이벤트가 한꺼번에 쏟아지면 자원 고갈 위험이 있었습니다. RabbitMQ는 큐를 `durable=true`로 선언해 서버가 죽어도 메시지가 보존되고, Consumer의 동시성(Concurrency)·Prefetch를 명시적으로 제한할 수 있어 이 두 문제를 구조적으로 해결합니다. 그래서 이벤트 기반 결합도 분리는 유지하되, 전달 수단만 Spring의 인메모리 이벤트에서 RabbitMQ로 교체했습니다 — 현재 `VehicleLogService`는 메인 트랜잭션 안에서 `RabbitTemplate`으로 직접 발행합니다.
+* **설계 변경(ADR): Spring Event → RabbitMQ.** 처음에는 서비스 계층에서 직접 MQ를 호출하지 않고 `ApplicationEvent` + `@TransactionalEventListener(phase = AFTER_COMMIT)`로 결합도를 분리하는 방식을 시도했습니다. 하지만 두 가지 한계가 명확했습니다 — ① 인메모리 이벤트라 서버가 커밋 직후 죽으면 아직 처리되지 않은 이벤트가 그냥 유실되고(내구성 없음), ② `@EnableAsync`만으로는 기본적으로 무제한 스레드 실행기를 쓰게 되어 대량 이벤트가 한꺼번에 쏟아지면 자원 고갈 위험이 있었습니다. RabbitMQ는 큐를 `durable=true`로 선언해 서버가 죽어도 메시지가 보존되고, Consumer의 동시성(Concurrency)·Prefetch를 명시적으로 제한할 수 있어 이 두 문제를 구조적으로 해결합니다. 그래서 이벤트 기반 결합도 분리는 유지하되, 전달 수단만 Spring의 인메모리 이벤트에서 RabbitMQ로 교체했습니다 — 현재 `VehicleLogService`는 메인 트랜잭션 안에서 `RabbitTemplate`으로 직접 발행합니다. **알려진 트레이드오프:** 이 발행은 DB 트랜잭션이 실제로 커밋되기 전(같은 메서드 내부)에 일어나므로, `save()` 성공 이후 커밋 시점 사이에 트랜잭션이 롤백되면 아직 반영되지 않은 데이터에 대한 메시지가 큐에 먼저 나가는 "유령 메시지" 가능성이 이론적으로 남아 있습니다. 예전 Spring Event 버전은 `AFTER_COMMIT` 시점에만 발행해 이 문제가 없었지만, 이번 프로젝트 규모에서는 발생 확률이 낮고 영향도(중복 이상탐지 로직 1회 공회전)도 작아 완전한 해결(Transactional Outbox 패턴 등) 대신 트레이드오프로 남겨두기로 했습니다.
 * **풍선 효과(I/O 병목) 해결:** 대량 데이터 저장 시, 단건 처리로 인한 네트워크 I/O 블로킹이 발생하며 톰캣 대기열이 터지는 이슈가 발생했습니다. 이를 해결하기 위해 JPA `saveAll()`을 걷어내고 `JdbcTemplate.batchUpdate`를 적용해 쿼리 전송을 최소화했으며, MQ 발행(Publish) 역시 Batch 처리로 개편했습니다.
 
 ```mermaid
@@ -173,3 +173,5 @@ $ ./gradlew bootRun
 초기 부하 테스트에서 직면한 높은 에러율과 처리 지연 문제를 해결하기 위해 Tomcat Thread Pool, HikariCP 커넥션 수, RabbitMQ Prefetch Count 등의 세부 파라미터를 조절해 보았습니다. 이 과정에서 각 설정값이 전체 시스템 파이프라인 중 어느 병목 구간에 어떻게 작용하는지 가시적으로 확인할 수 있었습니다. 
 
 동일한 하드웨어 환경임에도 불구하고 이 **파라미터 최적화** 작업만으로 에러율을 극적으로 낮추고 처리 속도를 개선해 내면서, 서비스의 트래픽 특성과 인프라 환경에 꼭 맞는 세밀한 튜닝 역량이 백엔드 개발자의 핵심 경쟁력임을 깨달았습니다.
+
+추가로, AI 코드 리뷰로 README와 실제 구현이 어긋난 부분(Spring Event 관련 서술)을 발견했고, 이를 그대로 반영하지 않고 커밋 이력과 트러블슈팅 기록을 직접 대조해 왜 그 구조로 바뀌었는지 근거를 추적한 뒤 문서를 정정했습니다.
