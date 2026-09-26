@@ -33,7 +33,7 @@ public class VehicleRedisService {
             // 2. Map 객체 JSON 문자열로 변환
             String jsonValue = objectMapper.writeValueAsString(statusData);
 
-            // 3. Resid 저장
+            // 3. Redis 저장
             redisTemplate.opsForValue().set(key, jsonValue);
         } catch (JsonProcessingException e) {
             log.error("Redis JSON 직렬화 실패. VehicleId: {}", vehicleId, e);
