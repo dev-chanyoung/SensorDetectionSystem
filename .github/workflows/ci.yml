@@ -14,11 +14,11 @@ jobs:
     steps:
       # 3. GitHub 저장소의 코드를 가상 환경으로 내려받기
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       # 4. Java 17 세팅
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
