@@ -32,4 +32,10 @@ public class DailyVehicleStats {
                 .safetyScore(safetyScore)
                 .build();
     }
+
+    public void update(double avgSpeed, double maxSpeed, int safetyScore) {
+        this.avgSpeed = avgSpeed;
+        this.maxSpeed = maxSpeed;
+        this.safetyScore = safetyScore;
+    }
 }
