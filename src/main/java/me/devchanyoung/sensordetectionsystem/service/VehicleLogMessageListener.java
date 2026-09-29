@@ -9,7 +9,6 @@ import me.devchanyoung.sensordetectionsystem.dto.VehicleLogMessage;
 import me.devchanyoung.sensordetectionsystem.repository.AlertRepository;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.endpoint.web.servlet.AdditionalHealthEndpointPathsWebMvcHandlerMapping;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

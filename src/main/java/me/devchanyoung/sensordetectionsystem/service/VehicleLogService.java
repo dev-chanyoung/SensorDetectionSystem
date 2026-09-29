@@ -2,18 +2,12 @@ package me.devchanyoung.sensordetectionsystem.service;
 
 import lombok.RequiredArgsConstructor;
 import me.devchanyoung.sensordetectionsystem.config.RabbitMQConfig;
-import me.devchanyoung.sensordetectionsystem.domain.Alert;
-import me.devchanyoung.sensordetectionsystem.domain.AlertType;
 import me.devchanyoung.sensordetectionsystem.domain.VehicleLog;
 import me.devchanyoung.sensordetectionsystem.dto.VehicleLogMessage;
 import me.devchanyoung.sensordetectionsystem.dto.VehicleLogRequest;
-import me.devchanyoung.sensordetectionsystem.dto.VehicleLogSavedEvent;
-import me.devchanyoung.sensordetectionsystem.repository.AlertRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogJdbcRepository;
 import me.devchanyoung.sensordetectionsystem.repository.VehicleLogRepository;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
