@@ -1,0 +1,6 @@
+scripts/jars/
+scripts/results/
+scripts/logs/
+scripts/src-*/
+scripts/*.log
+scripts/*.csv
